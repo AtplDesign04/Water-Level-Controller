@@ -1,74 +1,54 @@
-const { SerialPort } = require('serialport');
-const { ReadlineParser } = require('@serialport/parser-readline');
-const WebSocket = require('ws');
-const express = require('express');
-const path = require('path');
-const app = express();
-const port1 = process.env.PORT || 5000;
-// Set up the serial port connection
-const port = new SerialPort({ path: 'COM4', baudRate: 9600 });
-const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
+// Import required libraries
+const SerialPort = require('serialport');
+const Readline = require('@serialport/parser-readline');
 
-// Log and send data received from Arduino to WebSocket clients
-let buffer = '';  // Buffer to hold incomplete data
+// Serial Port configuration
+// Replace '/dev/ttyUSB0' with your actual port (e.g., /dev/ttyS0, /dev/ttyAMA0, or other as identified)
+const port = new SerialPort('/dev/ttyUSB0', { baudRate: 9600 });
 
-port.on('data', (data) => {
-  buffer += data;  // Append incoming data to buffer
+// Readline parser to split data by newline character
+const parser = port.pipe(new Readline({ delimiter: '\n' }));
 
-  // Check if the buffer contains a full message (newline character indicates end of message)
-  if (buffer.includes('\n')) {
-    const completeData = buffer.trim();  // Get the complete message and trim whitespace
-    // console.log(`Received complete data from Arduino: ${completeData}`);
+// Open event - triggered when the serial port is successfully opened
+port.on('open', () => {
+  console.log('Serial port is open and ready for communication.');
+});
 
-    // Send the complete data to the WebSocket clients
-    wss.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(completeData);
-      }
-    });
+// Data event - triggered when data is received
+parser.on('data', (data) => {
+  console.log('Received data:', data.trim()); // Trim to remove extra spaces or newline
+});
 
-    // Clear the buffer for the next message
-    buffer = '';
-  }
-});;
-
+// Error event - triggered when there is a problem with the serial port
 port.on('error', (err) => {
   console.error('Serial port error:', err.message);
 });
 
-// Set up WebSocket server
-const wss = new WebSocket.Server({ port: 8080 });
-
-wss.on('connection', (ws) => {
-  console.log('New client connected');
-  
-  ws.on('message', (message) => {
-    console.log(`Message received from client: ${message}`);
-    port.write(message, (err) => {
-      if (err) {
-        console.error('Error on write:', err.message);
-      }
-      console.log('Message sent to Arduino');
-    });
+// Function to send data to the serial port
+function sendDataToSerial(data) {
+  port.write(data, (err) => {
+    if (err) {
+      console.error('Error writing data to serial port:', err.message);
+    } else {
+      console.log('Data written to serial port:', data);
+    }
   });
+}
 
-  ws.on('close', () => {
-    console.log('Client disconnected');
+// Example of sending data after a delay (optional)
+setTimeout(() => {
+  sendDataToSerial('Hello, Device!\n');
+}, 5000); // Send after 5 seconds
+
+// Graceful shutdown handling (Ctrl+C)
+process.on('SIGINT', () => {
+  console.log('Closing the serial port...');
+  port.close((err) => {
+    if (err) {
+      console.error('Error closing serial port:', err.message);
+    } else {
+      console.log('Serial port closed.');
+    }
+    process.exit(0);
   });
-});
-app.use(express.static(path.join(__dirname, 'frontend', 'build')));
-
-// Catch-all handler to serve index.html for all routes
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'frontend', 'build', 'index.html'));
-});
-
-// Example API endpoint
-app.get('/api/test', (req, res) => {
-  res.json({ message: 'Hello from the backend!' });
-});
-
-// Start the server
-app.listen(port1, () => {
-  console.log(`Server is running on port ${port1}`);
 });
