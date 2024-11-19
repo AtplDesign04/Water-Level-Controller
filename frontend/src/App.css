@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.bg-primary{
+    background: rgb(27,103,99);
+background: linear-gradient(349deg, rgba(27,103,99,1) 0%, rgba(54,205,197,1) 100%);
+}
+@keyframes loader {
+    100% {
+      background-size: 110%;
+    }
+  }
+  
+  .animate-loader {
+    animation: loader 2s infinite steps(10);
+  }
+  
