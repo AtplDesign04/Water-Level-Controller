@@ -3,23 +3,37 @@ const SerialPort = require('serialport');
 const Readline = require('@serialport/parser-readline');
 
 // Serial Port configuration
-// Replace '/dev/ttyUSB0' with your actual port (e.g., /dev/ttyS0, /dev/ttyAMA0, or other as identified)
-const port = new SerialPort('/dev/ttyUSB0', { baudRate: 9600 });
+const portPath = '/dev/ttyUSB0'; // Replace with the actual port identified on your Raspberry Pi
+const baudRate = 9600; // Configure the baud rate based on your device's settings
 
-// Readline parser to split data by newline character
+// Create a new SerialPort instance
+const port = new SerialPort(portPath, { baudRate }, (err) => {
+  if (err) {
+    console.error(`Failed to open serial port at ${portPath}:`, err.message);
+    process.exit(1); // Exit if port cannot be opened
+  }
+});
+
+// Create a Readline parser to process data line by line
 const parser = port.pipe(new Readline({ delimiter: '\n' }));
 
-// Open event - triggered when the serial port is successfully opened
+// Handle the 'open' event
 port.on('open', () => {
-  console.log('Serial port is open and ready for communication.');
+  console.log(`Serial port ${portPath} is open with baud rate ${baudRate}.`);
 });
 
-// Data event - triggered when data is received
+// Handle incoming data
 parser.on('data', (data) => {
-  console.log('Received data:', data.trim()); // Trim to remove extra spaces or newline
+  const trimmedData = data.trim(); // Trim to remove extra spaces or newline
+  console.log('Received data:', trimmedData);
+
+  // Example: Handle specific commands or data
+  if (trimmedData === 'PING') {
+    sendDataToSerial('PONG\n'); // Respond to a PING command
+  }
 });
 
-// Error event - triggered when there is a problem with the serial port
+// Handle serial port errors
 port.on('error', (err) => {
   console.error('Serial port error:', err.message);
 });
@@ -30,25 +44,26 @@ function sendDataToSerial(data) {
     if (err) {
       console.error('Error writing data to serial port:', err.message);
     } else {
-      console.log('Data written to serial port:', data);
+      console.log('Data successfully written to serial port:', data.trim());
     }
   });
 }
 
-// Example of sending data after a delay (optional)
-setTimeout(() => {
+// Example: Send data at regular intervals (optional)
+const exampleInterval = setInterval(() => {
   sendDataToSerial('Hello, Device!\n');
-}, 5000); // Send after 5 seconds
+}, 10000); // Send every 10 seconds
 
-// Graceful shutdown handling (Ctrl+C)
+// Graceful shutdown handling (Ctrl+C or termination signal)
 process.on('SIGINT', () => {
   console.log('Closing the serial port...');
+  clearInterval(exampleInterval); // Clear any intervals before exiting
   port.close((err) => {
     if (err) {
       console.error('Error closing serial port:', err.message);
     } else {
-      console.log('Serial port closed.');
+      console.log('Serial port closed successfully.');
     }
-    process.exit(0);
+    process.exit(0); // Exit the application
   });
 });
