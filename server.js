@@ -1,20 +1,20 @@
 // Import required libraries
-const SerialPort = require('serialport');
+const { SerialPort } = require('serialport');
 const Readline = require('@serialport/parser-readline');
 
 // Serial Port configuration
-const portPath = '/dev/ttyUSB0'; // Replace with the actual port identified on your Raspberry Pi
-const baudRate = 9600; // Configure the baud rate based on your device's settings
+const portPath = '/dev/ttyUSB0'; // Replace with the actual port
+const baudRate = 9600; // Baud rate for the device
 
 // Create a new SerialPort instance
-const port = new SerialPort(portPath, { baudRate }, (err) => {
+const port = new SerialPort({ path: portPath, baudRate }, (err) => {
   if (err) {
     console.error(`Failed to open serial port at ${portPath}:`, err.message);
-    process.exit(1); // Exit if port cannot be opened
+    process.exit(1); // Exit the program if the port cannot be opened
   }
 });
 
-// Create a Readline parser to process data line by line
+// Create a Readline parser to process incoming data
 const parser = port.pipe(new Readline({ delimiter: '\n' }));
 
 // Handle the 'open' event
@@ -27,9 +27,9 @@ parser.on('data', (data) => {
   const trimmedData = data.trim(); // Trim to remove extra spaces or newline
   console.log('Received data:', trimmedData);
 
-  // Example: Handle specific commands or data
+  // Example: Respond to specific data
   if (trimmedData === 'PING') {
-    sendDataToSerial('PONG\n'); // Respond to a PING command
+    sendDataToSerial('PONG\n');
   }
 });
 
@@ -49,7 +49,7 @@ function sendDataToSerial(data) {
   });
 }
 
-// Example: Send data at regular intervals (optional)
+// Example: Send data periodically (optional)
 const exampleInterval = setInterval(() => {
   sendDataToSerial('Hello, Device!\n');
 }, 10000); // Send every 10 seconds
@@ -57,13 +57,13 @@ const exampleInterval = setInterval(() => {
 // Graceful shutdown handling (Ctrl+C or termination signal)
 process.on('SIGINT', () => {
   console.log('Closing the serial port...');
-  clearInterval(exampleInterval); // Clear any intervals before exiting
+  clearInterval(exampleInterval); // Clear any intervals
   port.close((err) => {
     if (err) {
       console.error('Error closing serial port:', err.message);
     } else {
       console.log('Serial port closed successfully.');
     }
-    process.exit(0); // Exit the application
+    process.exit(0); // Exit the program
   });
 });
