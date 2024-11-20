@@ -1,69 +1,85 @@
 // Import required libraries
 const { SerialPort } = require('serialport');
-const Readline = require('@serialport/parser-readline');
+const { ReadlineParser } = require('@serialport/parser-readline');
+const WebSocket = require('ws');
+const express = require('express');
+const path = require('path');
 
-// Serial Port configuration
-const portPath = '/dev/ttyUSB0'; // Replace with the actual port
-const baudRate = 9600; // Baud rate for the device
+const app = express();
+const httpPort = 5000; // HTTP server port
+const wsPort = 8080; // WebSocket server port
 
-// Create a new SerialPort instance
-const port = new SerialPort({ path: portPath, baudRate }, (err) => {
+// Set up the serial port connection
+const serialPortPath = '/dev/ttyACM0'; // Replace with your actual port on Raspberry Pi
+const baudRate = 9600;
+
+const port = new SerialPort({ path: serialPortPath, baudRate }, (err) => {
   if (err) {
-    console.error(`Failed to open serial port at ${portPath}:`, err.message);
-    process.exit(1); // Exit the program if the port cannot be opened
+    console.error(`Failed to open serial port ${serialPortPath}:`, err.message);
+    process.exit(1);
   }
 });
 
-// Create a Readline parser to process incoming data
-const parser = port.pipe(new Readline({ delimiter: '\n' }));
+const parser = port.pipe(new ReadlineParser({ delimiter: '\n' }));
 
-// Handle the 'open' event
-port.on('open', () => {
-  console.log(`Serial port ${portPath} is open with baud rate ${baudRate}.`);
+// Buffer for incomplete data
+let buffer = '';
+
+// Set up WebSocket server
+const wss = new WebSocket.Server({ port: wsPort });
+console.log(`WebSocket server running on ws://localhost:${wsPort}`);
+
+wss.on('connection', (ws) => {
+  console.log('New WebSocket client connected');
+
+  // Handle messages from WebSocket clients
+  ws.on('message', (message) => {
+    console.log(`Message received from client: ${message}`);
+    port.write(`${message}\n`, (err) => {
+      if (err) {
+        console.error('Error writing to serial port:', err.message);
+      } else {
+        console.log('Message sent to Arduino');
+      }
+    });
+  });
+
+  ws.on('close', () => {
+    console.log('WebSocket client disconnected');
+  });
 });
 
-// Handle incoming data
+// Handle data from the serial port
 parser.on('data', (data) => {
-  const trimmedData = data.trim(); // Trim to remove extra spaces or newline
-  console.log('Received data:', trimmedData);
+  buffer += data; // Append incoming data to buffer
 
-  // Example: Respond to specific data
-  if (trimmedData === 'PING') {
-    sendDataToSerial('PONG\n');
+  if (buffer.includes('\n')) {
+    const completeData = buffer.trim(); // Get complete message and trim whitespace
+    console.log(`Received data from Arduino: ${completeData}`);
+
+    // Broadcast data to all connected WebSocket clients
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(completeData);
+      }
+    });
+
+    buffer = ''; // Clear buffer for the next message
   }
 });
 
-// Handle serial port errors
 port.on('error', (err) => {
   console.error('Serial port error:', err.message);
 });
 
-// Function to send data to the serial port
-function sendDataToSerial(data) {
-  port.write(data, (err) => {
-    if (err) {
-      console.error('Error writing data to serial port:', err.message);
-    } else {
-      console.log('Data successfully written to serial port:', data.trim());
-    }
-  });
-}
+// Serve the frontend
+app.use(express.static(path.join(__dirname, 'frontend', 'build')));
 
-// Example: Send data periodically (optional)
-const exampleInterval = setInterval(() => {
-  sendDataToSerial('Hello, Device!\n');
-}, 10000); // Send every 10 seconds
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'frontend', 'build', 'index.html'));
+});
 
-// Graceful shutdown handling (Ctrl+C or termination signal)
-process.on('SIGINT', () => {
-  console.log('Closing the serial port...');
-  clearInterval(exampleInterval); // Clear any intervals
-  port.close((err) => {
-    if (err) {
-      console.error('Error closing serial port:', err.message);
-    } else {
-      console.log('Serial port closed successfully.');
-    }
-    process.exit(0); // Exit the program
-  });
+// Start the HTTP server
+app.listen(httpPort, () => {
+  console.log(`HTTP server running on http://localhost:${httpPort}`);
 });
