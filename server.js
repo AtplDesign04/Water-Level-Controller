@@ -5,7 +5,7 @@ const express = require('express');
 const path = require('path');
 
 // Windows-specific COM port
-const serialPortPath = '/dev/ttyprintk'; // Replace with your actual port from Device Manager
+const serialPortPath = '/dev/ttyUSB0'; // Replace with your actual port from Device Manager
 const baudRate = 9600;
 const httpPort = 5000; // HTTP server port
 const wsPort = 8080; // WebSocket server port
