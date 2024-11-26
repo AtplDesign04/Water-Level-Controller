@@ -4,8 +4,8 @@ const WebSocket = require('ws');
 const express = require('express');
 const path = require('path');
 
-// Set up ports
-const serialPortPath = 'COM5'; // Replace with your actual port
+// Windows-specific COM port
+const serialPortPath = '/dev/ttyACM0'; // Replace with your actual port from Device Manager
 const baudRate = 9600;
 const httpPort = 5000; // HTTP server port
 const wsPort = 8080; // WebSocket server port
@@ -15,9 +15,10 @@ const app = express();
 // Set up SerialPort
 const port = new SerialPort({ path: serialPortPath, baudRate }, (err) => {
   if (err) {
-    return console.error('Failed to open serial port:', err.message);
+    console.error(`Failed to open serial port ${serialPortPath}:`, err.message);
+    process.exit(1); // Exit if the serial port can't be opened
   }
-  console.log('Serial port opened successfully');
+  console.log(`Serial port ${serialPortPath} opened successfully`);
 });
 
 // Serial data parser
@@ -34,7 +35,7 @@ wss.on('connection', (ws) => {
   // Receive messages from frontend and send to Arduino
   ws.on('message', (message) => {
     console.log(`Message received from client: ${message}`);
-    port.write(`${message}\n`, (err) => {
+    port.write(`${message}`, (err) => {
       if (err) {
         console.error('Error writing to serial port:', err.message);
       } else {
