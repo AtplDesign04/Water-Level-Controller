@@ -5,7 +5,7 @@ const express = require('express');
 const path = require('path');
 
 // Set up ports
-const serialPortPath = '/dev/ttyACM0'; // Replace with your actual port
+const serialPortPath = 'COM5'; // Replace with your actual port
 const baudRate = 9600;
 const httpPort = 5000; // HTTP server port
 const wsPort = 8080; // WebSocket server port
